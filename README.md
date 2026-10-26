@@ -12,8 +12,7 @@
 
 ## 论文阅读记录
 
-- [2026 年秋季学期 · 第 1 周](Paper-Reading-Notes/2026-Autumn/Week-01.md)
-- [2026 年秋季学期 · 第 2 周](Paper-Reading-Notes/2026-Autumn/Week-02.md)
+- [2026 年秋季学期 · 第 1 周：C + Mag 动态 MRI 重建](Paper-Reading-Notes/2026-Autumn/Week-01.md)
 
 ## 使用方式
 
