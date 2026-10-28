@@ -50,9 +50,11 @@
 
 **核心公式**（论文式 (4)–(6)）：
 
-$
-u'_{\ell}=u_{\ell}+W_{\ell}h_{\ell},\qquad W_{\ell}\text{ 初始为零}
 $$
+u'_{\ell}=u_{\ell}+W_{\ell}h_{\ell}
+$$
+
+其中 $W_{\ell}$ 为零初始化的融合卷积。
 
 $$
 x_{prior}=f_{\theta}(x_T,T\mid x_{zf})
