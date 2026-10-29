@@ -78,19 +78,19 @@ $$
 
 **核心方法**：将传统重建目标中的手工正则化替换为 CNN 学习的去噪先验：
 
-$
+```math
 x_{\mathrm{rec}} = \arg\min_x \left( \|Ax-b\|_2^2 + \lambda\|x-D_w(x)\|_2^2 \right)
-$
+```
 
 其中 $A$ 为前向算子、$b$ 为测量数据，$D_w$ 为共享参数的 CNN 去噪器。通过近似交替更新得到：
 
-$
+```math
 z_n = D_w(x_n)
-$
+```
 
-$
+```math
 (A^H A + \lambda I)x_{n+1} = A^H b + \lambda z_n
-$
+```
 
 即反复执行 **CNN 去噪 → 数据一致性（DC）**。单线圈 Cartesian MRI 可在傅里叶域逐点求解 DC；多线圈情形使用**共轭梯度法（CG）**求解线性子问题，无需显式求逆。
 
