@@ -35,8 +35,6 @@
 
 ---
 
----
-
 ## 论文 3：C-MORE
 
 **论文**：[Beyond Diffusion: Consistency Models for One-Step, High-Fidelity MRI Reconstruction](https://proceedings.mlr.press/v315/akoda26a.html)（MIDL 2026）
@@ -72,9 +70,6 @@ $$
 
 ---
 
-
----
-
 ## 论文 4：MoDL（经典方法）
 
 **论文**：[MoDL: Model Based Deep Learning Architecture for Inverse Problems](https://arxiv.org/abs/1712.02862)（IEEE TMI, 2019）｜[代码](https://github.com/hkaggarwal/modl)
@@ -83,19 +78,19 @@ $$
 
 **核心方法**：将传统重建目标中的手工正则化替换为 CNN 学习的去噪先验：
 
-$$
-\min_x \|Ax-b\|_2^2+\lambda\|x-D_w(x)\|_2^2
-$$
+$
+x_{\mathrm{rec}} = \arg\min_x \left( \|Ax-b\|_2^2 + \lambda\|x-D_w(x)\|_2^2 \right)
+$
 
 其中 $A$ 为前向算子、$b$ 为测量数据，$D_w$ 为共享参数的 CNN 去噪器。通过近似交替更新得到：
 
-$$
-z_n=D_w(x_n)
-$$
+$
+z_n = D_w(x_n)
+$
 
-$$
-(A^HA+\lambda I)x_{n+1}=A^Hb+\lambda z_n
-$$
+$
+(A^H A + \lambda I)x_{n+1} = A^H b + \lambda z_n
+$
 
 即反复执行 **CNN 去噪 → 数据一致性（DC）**。单线圈 Cartesian MRI 可在傅里叶域逐点求解 DC；多线圈情形使用**共轭梯度法（CG）**求解线性子问题，无需显式求逆。
 
@@ -107,6 +102,9 @@ $$
 3. **跨迭代参数共享**：增加展开次数不必同比增加 CNN 参数量，降低数据和模型规模需求。
 
 **我的理解**：MoDL 的关键不是设计复杂的 CNN，而是把传统优化算法**展开为可训练网络**：内部循环更新重建图像，外部通过最终重建误差训练共享 CNN。
+
+
+---
 
 ## 本周总结
 
