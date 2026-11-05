@@ -156,3 +156,50 @@ $`\mathcal{L}_{\mathrm{JSSL}}=\mathcal{L}_{\mathrm{SL}}+\mathcal{L}_{\mathrm{SSL
 **局限性**：代理域与目标域差异太大可能引入偏差；依赖可用的全采样代理数据；结果受 SSDU 划分方式和损失权重影响；主要与 SSDU 这一代表性自监督方法比较。
 
 **我的理解**：这篇论文核心是**利用其他器官的完整数据提供强监督，并通过目标器官的欠采样数据适应目标域**。创新主要在训练策略而不是网络结构，与 FLEX-MRI 针对有限步推理过程的创新不同。
+
+---
+
+## 论文 5：E2E-VarNet — End-to-End Variational Networks for Accelerated MRI Reconstruction
+
+**论文**：[arXiv:2004.06688](https://arxiv.org/abs/2004.06688)（Anuroop Sriram 等，2020）｜[fastMRI 官方实现](https://github.com/facebookresearch/fastMRI)
+
+**研究问题**：欠采样多线圈 MRI 重建既需要利用真实 k-space 测量，也依赖准确的 Coil Sensitivity Maps（线圈敏感度图）。原有 VarNet 将传统方法预估的敏感度图作为固定输入；当 ACS 中心校准线较少时，估计误差会影响重建。
+
+**核心创新**：
+1. **端到端学习敏感度图（SME）**：从中心 ACS 数据构造输入，利用较小的 U-Net 预测并归一化各线圈敏感度图，与重建网络一起训练，不再完全依赖固定的 ESPIRiT 估计。
+2. **k-space 中间状态的展开网络**：直接以欠采样多线圈 k-space 为初始状态，通过多个 Cascade 在频域更新；每级结合 Soft Data Consistency（测量一致性修正）与 Learned Refinement（CNN 学习修正）。
+3. **统一的图像域修正网络**：将不同数量线圈的中间结果通过敏感度加权组合成一张复数图像，使用 U-Net 预测修正，再展开回各线圈并做 FFT；同一 Refinement CNN 可处理不同线圈数量。
+
+**核心公式**（论文式 8–12；用 GitHub 可渲染写法）：
+
+线圈组合 Reduce 与线圈展开 Expand：
+
+$`R(x_1,\ldots,x_N)=\sum_{i=1}^{N}S_i^*x_i`$
+
+$`E(x)=(S_1x,\ldots,S_Nx)`$
+
+**一个 Cascade 的 k-space 更新**（式 10）：
+
+$`k_{t+1}=k_t-\eta_tM(k_t-\tilde{k})+G(k_t)`$
+
+其中 $`-\eta_tM(k_t-\tilde{k})`$ 是软数据一致性修正，$`M`$ 只保留实际采样位置的误差；$`\eta_t`$ 是可学习参数。
+
+**CNN 修正模块**（式 11）：
+
+$`G(k_t)=\mathcal{F}\circ E\circ CNN\left(R\circ\mathcal{F}^{-1}(k_t)\right)`$
+
+对应流程：多线圈 k-space → IFFT → Reduce 组合成复数图像 → U-Net 预测修正 → Expand → FFT → 多线圈 k-space 修正。
+
+**敏感度估计模块**（式 12）：
+
+$`H=dSS\circ CNN\circ\mathcal{F}^{-1}\circ M_{\mathrm{center}}`$
+
+其中 $`M_{\mathrm{center}}`$ 保留 ACS 中心线，$`dSS`$ 归一化结果，使 $`\sum_i |S_i|^2=1`$。
+
+**训练与推理**：输入为欠采样多线圈 k-space（$`k_0=\tilde{k}`$），经过 **12 个 Cascade**，再做各线圈 IFFT 和 RSS 得到幅度图像；用完整采样参考图像的 **SSIM 损失**端到端训练 SME、各级 U-Net 和步长。主要实验采用 fastMRI 多线圈膝关节/脑部数据，Adam、学习率 0.0003。
+
+**实验结果**（论文 Table 2：膝关节随机掩码、8× 欠采样，SSIM 越高越好）：VN **0.762**；VNU（换 U-Net）**0.870**；VNU-K（k-space 中间状态）**0.871**；E2E-VN **0.878**。增益最大的一步来自更强的 U-Net；端到端敏感度估计进一步改善结果，ACS 较少时尤为重要。
+
+**局限性**：实验主要针对 fastMRI 二维多线圈数据；训练依赖完整采样参考图像；质量指标不能代替临床诊断评估；附录指出 SSIM 等损失可能使重建结果偏平滑。
+
+**我的理解**：这篇论文的关键是**在频域迭代更新，同时在图像域利用 U-Net 学习修正，并把线圈敏感度估计并入端到端训练**。与 JSSL 侧重缺少目标域完整标签时的联合训练策略不同，E2E-VarNet 的重点是重建网络架构及物理编码模型的学习。
