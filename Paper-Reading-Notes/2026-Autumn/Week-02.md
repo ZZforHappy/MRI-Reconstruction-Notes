@@ -116,3 +116,43 @@ $`\hat{x}_{t_{j-1}}=\Pi_y[\tilde{x}_{t_j}+\mu_\theta(\tilde{x}_{t_j},t_{j-1})]`$
 **局限性**：主要实验是有全采样参考的二维笛卡尔多线圈 MRI；非笛卡尔、三维及自监督场景尚需验证。随机性不等于已证明得到精确后验样本，仍需评估临床诊断细节可靠性。
 
 **我的理解**：核心不是发明新的 U-Net，而是**改变训练目标与推理轨迹**：用随机 k-space 退化构造有限步监督标签，学习完整增量；推理时以轻量随机扰动探索不同路径，再用 DC 约束已采集数据。
+
+---
+
+## 论文 4：JSSL — Joint Supervised and Self-supervised Learning for MRI Reconstruction
+
+**论文**：George Yiasemis 等，*Medical Imaging with Deep Learning (MIDL 2025)*，PMLR 301:1771–1794｜[论文集](https://proceedings.mlr.press/v301/)｜[代码：DIRECT](https://github.com/NKI-AI/direct)
+
+**研究问题**：目标器官（前列腺、心脏等）不一定有完整采样 k-space，无法直接按常规方式做有监督 MRI 重建；只使用目标域欠采样数据的 SSDU 自监督学习性能有限。
+
+**核心创新**：
+1. **跨器官的联合训练**：使用 Proxy Domain（脑部、膝关节等）的完整 k-space 进行有监督学习（SL）；同时使用 Target Domain（前列腺或心脏）的欠采样 k-space 进行自监督学习（SSL），共同更新**同一个重建网络**。
+2. **双域联合损失**：SL 与 SSL 都计算图像域和 k-space 域损失。SSL 沿用 SSDU 思路，把目标域**已采集的** k-space 拆成输入与留出监督的两组，不需要完整目标域标签。
+3. **与网络架构解耦**：主要使用物理引导的 vSHARP（12 次展开迭代），并端到端学习线圈敏感度估计；附录还验证 U-Net 和 E2EVarNet。
+
+**核心公式**（论文式 6、9、10；仅保留关键关系）：
+
+自监督数据划分：
+
+$`\Theta\cup\Lambda=M,\qquad\Theta\cap\Lambda=\varnothing`$
+
+其中 $`M`$ 是实际测量的 k-space 位置；$`\Lambda`$ 构成网络输入，$`\Theta`$ 用于计算自监督误差。
+
+两种训练损失及总目标：
+
+$`\mathcal{L}_{\mathrm{SL}}=\mathcal{L}_{\mathrm{SL}}^{I}+\mathcal{L}_{\mathrm{SL}}^{K}`$
+
+$`\mathcal{L}_{\mathrm{SSL}}=\mathcal{L}_{\mathrm{SSL}}^{I}+\mathcal{L}_{\mathrm{SSL}}^{K}`$
+
+$`\mathcal{L}_{\mathrm{JSSL}}=\mathcal{L}_{\mathrm{SL}}+\mathcal{L}_{\mathrm{SSL}}`$
+
+**推理过程**：仅输入目标器官欠采样多线圈 k-space；通过逆 FFT 和线圈敏感度组合构造初始图像，送入训练后的重建网络。推理时**无需代理器官数据**；也不是单独一个 U-Net 后处理器。
+
+**实验结果**（论文 Tables 1–2，8× 欠采样）：
+- **前列腺目标域（脑部+膝关节代理）**：SSL **31.1 dB / SSIM 0.801**；JSSL **32.5 dB / 0.842**；拥有目标域完整标签的 SL **33.9 dB / 0.868**。
+- **心脏目标域（脑部+膝关节+前列腺代理）**：SSL **33.2 dB / 0.854**；JSSL **34.3 dB / 0.893**；目标域完整标签 SL **40.6 dB / 0.965**。
+- JSSL 大部分条件下优于纯 SSL，但并不超过拥有完整目标域标签的 SL；部分高加速设置的指标没有全面领先。
+
+**局限性**：代理域与目标域差异太大可能引入偏差；依赖可用的全采样代理数据；结果受 SSDU 划分方式和损失权重影响；主要与 SSDU 这一代表性自监督方法比较。
+
+**我的理解**：这篇论文核心是**利用其他器官的完整数据提供强监督，并通过目标器官的欠采样数据适应目标域**。创新主要在训练策略而不是网络结构，与 FLEX-MRI 针对有限步推理过程的创新不同。
