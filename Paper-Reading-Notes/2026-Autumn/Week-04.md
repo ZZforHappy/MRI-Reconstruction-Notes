@@ -61,3 +61,63 @@ $`b\xrightarrow{\mathrm{I^2SB+DC}}x'_0\xrightarrow{\mathrm{Inversion}}\hat b\xri
 ### 我的理解
 
 **这篇论文的主要创新不是 I²SB 本身，而是“测量约束的跨对比度桥重建 + 通过 Inversion 修正不可靠引导”。** 它最值得借鉴的科研思路是：先发现引导图像可能不可信这一失效场景，再提出针对性的校正机制，最后用错位与伪结构实验验证。后续可重点研究：**能否直接精细化第一次重建结果，以更低计算开销达到与 Inversion 相近的鲁棒性？**
+
+---
+
+## 论文 2：Diffusion Modeling with Domain-conditioned Prior Guidance for Accelerated MRI and qMRI Reconstruction（DiMo）
+
+**论文**：Wanyu Bian 等，*IEEE Transactions on Medical Imaging*（TMI），2025，44(9)：3539–3551。DOI：[10.1109/TMI.2024.3440227](https://doi.org/10.1109/TMI.2024.3440227)  
+**全文**：[PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC11806118/) ｜ [arXiv](https://arxiv.org/abs/2309.00783)
+
+**研究问题**：在 MRI 原生采集域而非仅图像域执行扩散，将测量物理约束融入网络训练及采样。
+
+### 核心创新点
+
+1. **原生域扩散**：Static DiMo 在复数 k-space 中执行 DDPM；Quantitative DiMo 在 qMRI 参数空间扩散。k-space 扩散此前已有研究，贡献是整体框架与任务扩展。
+2. **物理先验引导（DC）**：在训练和推理的扩散过程中融入真实欠采样数据，使用时间相关权重约束测量一致性。
+3. **扩散内梯度下降（GD）**：利用 MRI 前向模型在扩散步骤中迭代修正数据保真误差，将 DDPM、DC、GD 结合。
+
+### 方法与核心公式
+
+**MRI 前向模型**：
+
+`f=Ax+\epsilon,\quad A=P_{\Omega}FS`
+
+其中 `P_{\Omega}` 为采样算子，`F` 为傅里叶变换，`S` 表示线圈敏感度。
+
+**k-space DDPM 前向扩散**：
+
+`\hat f_t=\sqrt{\bar\alpha_t}\hat f_0+\sqrt{1-\bar\alpha_t}\epsilon`
+
+**噪声预测损失（简写）**：
+
+`\mathcal L=\mathbb E[\|\epsilon-\epsilon_\theta(\hat f_t^{\mathrm{guided}},t)\|_2^2]`
+
+这里 `\hat f_t^{\mathrm{guided}}` 表示经测量约束修正后的带噪状态。
+
+**数据一致性（示意形式）**：
+
+`\hat f_t^{DC}=P_{\Omega}[\lambda_t f+(1-\lambda_t)\hat f_t]+(I-P_{\Omega})\hat f_t`
+
+**梯度下降（式 5）**：
+
+`\hat f^{(k+1)}=\hat f^{(k)}-\eta_k\nabla_{\hat f^{(k)}}\frac12\|AF^{-1}\hat f^{(k)}-f\|_2^2`
+
+**整体流程**：在完整 k-space 上训练去噪网络；每步以 DC/GD 引入物理先验；推理从噪声逐步恢复完整 k-space；最后 IFFT 获得重建图像。
+
+### 实验
+
+- Static DiMo：多线圈膝关节 MRI；25 名受试者（20 名训练，5 名测试）；PD/T2 对比度；4×、5×、6× 欠采样。
+- 对比包含传统深度重建、图像域扩散以及已有 k-space 扩散方法 MC-DDPM。
+- 框架还拓展到 qMRI 参数空间重建。
+
+### 局限性与个人思考
+
+1. **组合式创新**：DDPM、DC 和 GD 都是成熟技术；“首次将 DDPM 用于 k-space”并不准确。
+2. **计算成本高**：多步反向扩散叠加每步迭代 GD，推理效率值得评估。
+3. **DC 和 GD 部分功能重叠**：理想单线圈笛卡尔采样且已进行精确硬 DC 时，针对同一数据保真项重复 GD 未必有额外收益。
+4. **研究启发**：频率自适应噪声调度、少步采样及复数先验建模值得进一步验证，但须检索相关工作。
+
+### 我的理解
+
+**DiMo = k-space DDPM + 动态 DC + 迭代 GD，并拓展到 qMRI 参数域。** 创新重心在物理先验结合与跨任务验证。后续应该读 **MC-DDPM**，重点比较其与 DiMo 的差别。
