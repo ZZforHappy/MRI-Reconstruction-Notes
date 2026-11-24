@@ -13,6 +13,10 @@
 ## 论文阅读记录
 
 - [2026 年秋季学期 · 第 1 周：C + Mag、LGGS](Paper-Reading-Notes/2026-Autumn/Week-01.md)
+- [第 2 周](Paper-Reading-Notes/2026-Autumn/Week-02.md)
+- [第 3 周](Paper-Reading-Notes/2026-Autumn/Week-03.md)
+- [第 4 周](Paper-Reading-Notes/2026-Autumn/Week-04.md)
+- [第 5 周：MPFlow — 多模态后验引导 Flow Matching](Paper-Reading-Notes/2026-Autumn/Week-05.md)
 
 ## 使用方式
 
