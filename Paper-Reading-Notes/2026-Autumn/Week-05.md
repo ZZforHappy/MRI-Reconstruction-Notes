@@ -56,7 +56,84 @@
 
 ---
 
+## 论文 2：ReCoFlow-MRI（GNL 感知的少步条件流匹配）
+
+**论文**：[ReCoFlow-MRI: Few-Step Conditional Flow Matching for GNL-Induced Nonlinear MRI Reconstruction](https://arxiv.org/abs/2611.27590)（Qidi Luo 等，2026-11-20 arXiv 预印本）  
+**全文**：[PDF](https://arxiv.org/pdf/2611.27590)  
+**发表状态**：论文使用 IEEE Transactions on Biomedical Engineering 的排版格式，但目前不能据此确认正式接收。
+
+**研究问题**：欠采样 MRI 存在混叠伪影，梯度磁场非线性（GNL）还会造成空间编码偏差和几何畸变。如何在考虑真实非线性编码的同时，以很少的 Flow Matching 推理步数得到准确重建？
+
+### 核心创新点
+
+1. **GNL-aware 条件构造**：通过网格模体标定 GNL 位移场 `\Delta L`，将其融入非线性 MRI 编码算子 `A_{\Delta L}`，再由其伴随运算构造畸变感知的 Zero-filled 条件图像 `c`。GNL 标定与 NUFFT 均为已有技术，本文贡献在于将其用于条件 Flow Matching 重建。
+2. **条件速度场重建**：网络接受当前生成状态、时间与条件图像 `c`，从高斯噪声沿直线概率路径学习到完整 MRI 的速度场；不依赖另一套 T1/FLAIR 辅助模态。
+3. **五步终点监督微调（Endpoint Fine-tuning）**：先进行标准速度匹配预训练，再对五步 Euler 积分后的最终图像施加 L1 损失；只通过最后一步反向传播，以较低成本改善有限步重建质量。
+
+### 核心方法与公式
+
+**GNL 感知测量模型**：
+
+```math
+y=M A_{\Delta L}x,\qquad
+(A_{\Delta L})_{k,r}=\exp\{-i2\pi k\cdot[r+\Delta L(r)]\}
+```
+
+**条件图像（GNL-aware zero-filled）**：
+
+```math
+c=A_{\Delta L}^{H}y
+```
+
+其中伴随算子不等于严格的逆算子，`c` 仍可能存在欠采样伪影和残余误差。
+
+**Conditional Flow Matching 预训练**：
+
+```math
+x_t=(1-t)x_0+t x_1,\qquad x_0\sim\mathcal N(0,I)
+```
+
+```math
+\mathcal L_{CFM}=\mathbb E\left[\left\|v_\theta(x_t,t\mid c)-(x_1-x_0)\right\|_2^2\right]
+```
+
+**五步 Euler 推理与终点微调**：
+
+```math
+z_{k+1}=z_k+\tfrac15v_\theta(z_k,k/5\mid c),\quad k=0,\ldots,4
+```
+
+```math
+\mathcal L_{pix}=\mathbb E[\|z_5-x_1\|_1]
+```
+
+训练时前四步的状态停止梯度传播，只让最后一步的网络调用参与终点损失的反向传播。
+
+**完整流程**：GNL 位移场标定 → GNL-aware NUFFT 伴随构造 `c` → CFM 预训练 → 五步终点微调 → 五步 Euler 推理。
+
+### 实验结论
+
+- **模拟数据**：在 fastMRI 脑部数据上模拟欠采样与 GNL，论文报告五步 ReCoFlow-MRI 相对所比较的方法（包括 128 步扩散采样）取得较优 PSNR/SSIM。
+- **实测场景**：在 MRI-Linac 模体与志愿者数据上进行验证。网格模体的最大几何误差从 **24.95 mm** 降至 **2.12 mm**；3718 个标记点中 **98.39%** 的误差低于 1 mm。
+- **消融意义**：论文报告终点微调能进一步提升有限步重建指标，但需要与匹配算力、相同物理条件的基线公平比较。
+
+### 局限性与个人思考
+
+1. **组合式创新为主**：GNL 校准、NUFFT、CFM 均已有研究。更有针对性的设计是针对五步终点误差的微调，而非提出全新 Flow Matching 理论。
+2. **GNL 物理约束主要进入条件输入**：后续 ODE 更新没有显式逐步执行 `MA_{\Delta L}\hat x=y` 的 Data Consistency，因此物理一致性不由生成结构严格保证。
+3. **伴随图像并非完全去畸变结果**：`c=A_{\Delta L}^{H}y` 只是利用标定位移场进行物理感知的初始重建，剩余误差交由网络学习处理。
+4. **应用场景依赖 GNL 标定**：如果只研究普通 fastMRI 欠采样，直接移植方法可能变成“物理预处理 + 条件生成”的简单拼接。
+5. **研究启发**：更值得研究的是有限步 Flow 的训练目标与实际重建误差之间的差距，以及如何在少步生成时显式保留真实多线圈 k-space 测量一致性；这些是可探索方向，并非本文已证明的贡献。
+
+### 我的理解
+
+**ReCoFlow-MRI = GNL-aware Zero-filled 条件 + Conditional Flow Matching + 五步 Endpoint Fine-tuning。** 和 MPFlow 的“无条件先验 + 辅助模态后验引导”不同，它把欠采样物理信息直接送入速度网络训练。论文更偏向具有实际 MRI-Linac 应用价值的组合式工作；算法层面最值得学习的是**从速度匹配转向有限步终点监督**。
+
+---
+
 ## 本周总结
 
 - **MPFlow**：通过配准的辅助模态引入额外解剖信息，帮助无条件 Flow Matching 在 MRI 逆问题中减少生成幻觉。
-- **后续阅读重点**：无条件 Flow 的后验引导 vs. 直接训练条件 Flow；跨模态配准鲁棒性；原始多线圈 k-space 验证。
+- **ReCoFlow-MRI**：GNL 感知的物理条件图像 + 条件 Flow Matching + 五步终点微调，主要解决少步生成重建及空间畸变问题。
+- **两篇对比**：MPFlow 侧重推理期多模态引导与幻觉控制；ReCoFlow-MRI 侧重训练期物理条件输入与少步终点质量。
+- **后续阅读重点**：如何让少步 Flow 在真实多线圈原始 k-space 上保持显式数据一致性；终点微调是否真正改善泛化。
