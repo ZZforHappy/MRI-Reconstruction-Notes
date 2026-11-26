@@ -131,9 +131,82 @@ z_{k+1}=z_k+\tfrac15v_\theta(z_k,k/5\mid c),\quad k=0,\ldots,4
 
 ---
 
+## 论文 3：FLAT（用 Flow-Aligned Training 训练 MRI 深度展开网络）
+
+**论文**：[FLAT: FLow-Aligned Training of Unrolled Networks for MRI Reconstruction](https://arxiv.org/abs/2512.03020)（Kehan Qi 等；2025 年 12 月首次公开，2026 年更新）  
+**全文**：[arXiv PDF](https://arxiv.org/pdf/2512.03020v3)
+
+**研究问题**：传统 MRI 深度展开网络由多个 Cascade 逐步重建，通常重视最终输出，但中间更新可能出现不稳定、质量反复波动。如何借鉴连续时间 Flow 的轨迹概念，约束中间迭代并改善重建？
+
+### 核心创新点
+
+1. **展开网络与条件流 ODE 的数学联系（Proposition III.1）**：在特定一阶梯度更新、后验能量及参数对应关系下，可把一个 Cascade 解释为连续动力系统的一次 Euler 离散步。这个命题不是“任意展开网络都等价于精确的生成式 Flow Matching”。
+2. **ODE-consistent Scheduling and Parameters**：为各级 Cascade 分配时间节点 `t_k` 和间隔 `\Delta t_k`，按照连续 ODE 的离散关系约束更新步长/参数，而不让各级参数完全无关地自由变化。
+3. **Velocity Alignment（最核心的训练设计）**：以 Zero-filled 与完整参考图像之间的线性插值作为理想中间轨迹，监督各级 Cascade 的更新速度，使中间输出更靠近对应时间点的参考状态。
+
+### 核心公式与理解
+
+**传统一阶展开更新（示意，正向编号）**：
+
+```math
+x^{(k+1)}=x^{(k)}-\eta_kA^H(Ax^{(k)}-y)+\eta_k\mu\Phi_k(x^{(k)})
+```
+
+**从后验能量到连续更新（理论解释）**：
+
+```math
+E(x;y)=\frac{1}{2\sigma^2}\|Ax-y\|_2^2-\log p(x)
+```
+
+```math
+\frac{dx_t}{dt}=-\lambda(t)\nabla_x E(x_t;y)
+```
+
+这是特定能量梯度动力系统与一阶展开网络的形式对应；并不能单凭此式认定算法在精确采样后验分布。
+
+**线性插值参考轨迹**：
+
+```math
+x_t^*=(1-t)x_{\mathrm{ZF}}+t x_{\mathrm{GT}}
+```
+
+**参考速度与实际 Cascade 速度（便于理解的离散表示）**：
+
+```math
+v_k^{\mathrm{target}}=\frac{x^*_{t_{k+1}}-x^{(k)}}{\Delta t_k},
+\qquad
+v_k^{\mathrm{pred}}=\frac{x^{(k+1)}-x^{(k)}}{\Delta t_k}
+```
+
+**速度对齐的直观等价解释**：采用相同范数、同一当前状态的定义时，
+
+```math
+\|v_k^{\mathrm{target}}-v_k^{\mathrm{pred}}\|
+=\frac{1}{\Delta t_k}\|x^{(k+1)}-x^*_{t_{k+1}}\|
+```
+
+因此这一速度对齐项可解释为**按时间步长加权的中间图像监督**。上面是帮助理解的等价化简，完整训练损失的系数、求和和监督设定应以论文版本为准。
+
+### 方法流程
+
+**Zero-filled → 多个 CNN/物理 DC Cascade → 重建图像**。FLAT 保留展开式重建主体，通过时间调度和中间轨迹监督改进训练，**并未另外训练从高斯噪声生成 MRI 的标准 Flow Matching 速度网络**。
+
+### 实验与局限
+
+- 作者在三个 MRI 数据集上报告 FLAT 改善重建质量和迭代稳定性，并将其与传统展开网络和生成式方法进行比较。
+- **需关注的关键消融**：自由学习参数 vs. ODE 一致时间调度；仅最终损失 vs. 普通 Deep Supervision vs. 线性插值中间监督/Velocity Alignment。若差异主要来自中间监督，Flow 理论框架对性能提升的必要性仍需论证。
+- **方法边界**：将一阶迭代写成 ODE 离散本身不是全新数学结论；选择线性中间轨迹也是一种监督假设，而非真实 MRI 重建必须遵循的最优轨迹。
+
+### 我的理解
+
+**FLAT 本质上是一种受 Flow Matching/连续概率流启发的深度展开网络训练策略，不是独立的生成式 Flow Matching MRI 重建模型。** 它最值得记住的是：用线性插值参考状态约束每个 Cascade 的迭代过程，并为时间步长建立一致性调度。创新性评估时，重点比较 Velocity Alignment 与普通加权中间层监督究竟有多大区别。
+
+---
+
 ## 本周总结
 
 - **MPFlow**：通过配准的辅助模态引入额外解剖信息，帮助无条件 Flow Matching 在 MRI 逆问题中减少生成幻觉。
 - **ReCoFlow-MRI**：GNL 感知的物理条件图像 + 条件 Flow Matching + 五步终点微调，主要解决少步生成重建及空间畸变问题。
-- **两篇对比**：MPFlow 侧重推理期多模态引导与幻觉控制；ReCoFlow-MRI 侧重训练期物理条件输入与少步终点质量。
+- **FLAT**：把展开网络与特定连续流联系起来，用时间调度和线性参考轨迹监督 Cascade；本质仍为级联重建，而非独立生成式 Flow Matching。
+- **三篇对比**：MPFlow 侧重推理期后验引导；ReCoFlow-MRI 直接训练条件速度网络并做终点微调；FLAT 主要用 Flow 思想训练传统深度展开网络。
 - **后续阅读重点**：如何让少步 Flow 在真实多线圈原始 k-space 上保持显式数据一致性；终点微调是否真正改善泛化。
